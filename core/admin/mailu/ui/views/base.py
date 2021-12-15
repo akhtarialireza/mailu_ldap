@@ -21,8 +21,9 @@ def login():
 
         if ldap.is_configured():
             user = ldap.get_user_by_mail(form.email.data)
-            if user.check_password(form.pw.data) is False:
-                user = None
+            if user: 
+                if user.check_password(form.pw.data) is False:
+                    user = None
 
         if user is None: 
             user = models.User.login(form.email.data, form.pw.data)
