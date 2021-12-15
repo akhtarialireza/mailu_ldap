@@ -24,11 +24,12 @@ RUN mkdir -p /app
 WORKDIR /app
 
 COPY requirements-prod.txt requirements.txt
-RUN apk add --no-cache openssl curl postgresql-libs mariadb-connector-c \
-  && apk add --no-cache --virtual build-dep \
-  openssl-dev libffi-dev python3-dev build-base postgresql-dev mariadb-connector-c-dev cargo \
-  && pip3 install -r requirements.txt \
-  && apk del --no-cache build-dep
+RUN apk add --no-cache openssl curl postgresql-libs mariadb-connector-c
+RUN apk add --no-cache --virtual build-dep
+RUN apk add openssl-dev libffi-dev python3-dev build-base postgresql-dev mariadb-connector-c-dev cargo
+RUN apk add openldap-dev
+RUN pip3 install -r requirements.txt
+RUN apk del --no-cache build-dep
 
 COPY --from=assets static ./mailu/ui/static
 COPY mailu ./mailu

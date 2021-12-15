@@ -1,8 +1,9 @@
-from mailu import models
+from mailu import models, ldap
 from mailu.ui import ui, forms, access
 
 import flask
 import flask_login
+
 
 
 @ui.route('/', methods=["GET"])
@@ -15,7 +16,17 @@ def index():
 def login():
     form = forms.LoginForm()
     if form.validate_on_submit():
-        user = models.User.login(form.email.data, form.pw.data)
+
+        user = None
+
+        if ldap.is_configured():
+            user = ldap.get_user_by_mail(form.email.data)
+            if user.check_password(form.pw.data) is False:
+                user = None
+
+        if user is None: 
+            user = models.User.login(form.email.data, form.pw.data)
+            
         if user:
             flask.session.regenerate()
             flask_login.login_user(user)

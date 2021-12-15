@@ -1,4 +1,4 @@
-from mailu import models
+from mailu import models, ldap
 from flask import current_app as app
 
 import re
@@ -48,8 +48,10 @@ def handle_authentication(headers):
         except:
             app.logger.warn(f'Received undecodable user/password from nginx: {raw_user_email!r}/{raw_password!r}')
         else:
+            
             user = models.User.query.get(user_email)
             status = False
+
             if user and user.enabled:
                 if (protocol == "imap" and user.enable_imap) or \
                    (protocol == "pop3" and user.enable_pop) or \
@@ -62,6 +64,17 @@ def handle_authentication(headers):
                                 break
                     if not status and user.check_password(password):
                         status = True
+
+            if status is False: 
+                _user = ldap.get_user_by_mail(user_email)
+
+                if _user and _user.check_password(password) :
+                    status = True
+                    user = models.User.query.get(user_email)
+                    if user is None: 
+                        create_user(user_email.replace('@', '').replace(app.config.get('DOMAIN'), ''), app.config.get('DOMAIN'), password)
+
+             
             if status:
                 server, port = get_server(headers["Auth-Protocol"], True)
                 return {
@@ -114,3 +127,24 @@ def resolve_hostname(hostname):
     It is capable of retrying in case the host is not immediately available
     """
     return socket.gethostbyname(hostname)
+
+
+def create_user(localpart, domain_name, password, hash_scheme=None):
+
+    db = models.db
+    """ Create a user
+    """
+    if hash_scheme is None:
+        hash_scheme = app.config['PASSWORD_SCHEME']
+    domain = models.Domain.query.get(domain_name)
+    if not domain:
+        domain = models.Domain(name=domain_name)
+        db.session.add(domain)
+    user = models.User(
+        localpart=localpart,
+        domain=domain,
+        global_admin=False
+    )
+    user.set_password(password, hash_scheme=hash_scheme)
+    db.session.add(user)
+    db.session.commit()
